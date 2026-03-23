@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Регистър на лекарствените продукти</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@400;600;700&display=swap');
+  :root{--bg:#0f1117;--surface:#1a1d27;--border:#2a2d3a;--accent:#00d4aa;--accent2:#ff6b6b;--text:#e8eaf0;--muted:#7a7f96;--rx:#ff6b6b;--otc:#00d4aa;--rx-bg:rgba(255,107,107,0.08);--otc-bg:rgba(0,212,170,0.08)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans Condensed',sans-serif;min-height:100vh}
+  header{background:var(--surface);border-bottom:1px solid var(--border);padding:20px 24px 16px;display:flex;align-items:flex-end;gap:16px;position:sticky;top:0;z-index:100}
+  .logo-block{flex:1}
+  .logo-block h1{font-size:11px;font-weight:600;letter-spacing:.15em;color:var(--accent);text-transform:uppercase;font-family:'IBM Plex Mono',monospace;margin-bottom:2px}
+  .logo-block p{font-size:20px;font-weight:700;letter-spacing:-.02em}
+  .db-count{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);text-align:right;line-height:1.6}
+  .db-count strong{display:block;font-size:22px;color:var(--accent);font-weight:600}
+  .search-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .search-wrap{position:relative;flex:1;min-width:240px}
+  .search-wrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+  #searchInput{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'IBM Plex Sans Condensed',sans-serif;font-size:15px;padding:9px 12px 9px 38px;outline:none;transition:border-color .15s}
+  #searchInput:focus{border-color:var(--accent)}
+  #searchInput::placeholder{color:var(--muted)}
+  .search-type{display:flex;gap:6px;flex-wrap:wrap}
+  .type-btn{background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--muted);cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.06em;padding:7px 12px;text-transform:uppercase;transition:all .12s}
+  .type-btn.active{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+  .rx-filter{display:flex;gap:6px}
+  .rx-btn{background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--muted);cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.04em;padding:7px 10px;text-transform:uppercase;transition:all .12s}
+  .rx-btn.active-rx{background:var(--rx-bg);border-color:var(--rx);color:var(--rx)}
+  .rx-btn.active-otc{background:var(--otc-bg);border-color:var(--otc);color:var(--otc)}
+  .stats-bar{padding:10px 24px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px}
+  .stats-bar span{color:var(--accent);font-weight:600}
+  #fuzzyNote{display:none;color:var(--accent2);font-size:10px}
+  main{padding:16px 24px}
+  #loadingMsg{text-align:center;padding:60px 20px;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:13px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .spin{display:inline-block;animation:spin 1s linear infinite;margin-right:8px}
+  #noResults{display:none;text-align:center;padding:60px 20px;color:var(--muted)}
+  #noResults .big{font-size:36px;margin-bottom:8px}
+  #noResults p{font-size:14px}
+  .drug-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden;transition:border-color .15s}
+  .drug-card:hover{border-color:#3a3d4a}
+  .drug-card.rx-card{border-left:3px solid var(--rx)}
+  .drug-card.otc-card{border-left:3px solid var(--otc)}
+  .card-header{display:flex;align-items:flex-start;gap:12px;padding:14px 16px 12px;cursor:pointer;user-select:none}
+  .rx-badge{flex-shrink:0;border-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;letter-spacing:.08em;padding:4px 7px;text-transform:uppercase;margin-top:2px}
+  .badge-rx{background:var(--rx-bg);border:1px solid var(--rx);color:var(--rx)}
+  .badge-otc{background:var(--otc-bg);border:1px solid var(--otc);color:var(--otc)}
+  .card-main{flex:1;min-width:0}
+  .drug-name{font-size:16px;font-weight:700;letter-spacing:-.01em;line-height:1.25;margin-bottom:3px}
+  .drug-desc{color:var(--muted);font-size:12px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .card-meta{display:flex;gap:14px;align-items:center;flex-shrink:0}
+  .meta-tag{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted)}
+  .meta-tag strong{color:var(--text)}
+  .expand-icon{color:var(--muted);transition:transform .2s;flex-shrink:0;margin-top:2px}
+  .drug-card.expanded .expand-icon{transform:rotate(180deg)}
+  .card-body{border-top:1px solid var(--border);display:none;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+  .drug-card.expanded .card-body{display:grid}
+  .detail-item{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:10px 14px}
+  .detail-label{color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;letter-spacing:.1em;margin-bottom:3px;text-transform:uppercase}
+  .detail-value{font-size:13px;font-weight:600;line-height:1.3;word-break:break-word}
+  mark{background:rgba(0,212,170,.22);border-radius:2px;color:var(--accent);padding:0 1px}
+  @media(max-width:640px){header{flex-wrap:wrap;gap:10px}.search-bar{flex-direction:column}.search-wrap{min-width:100%}.card-meta{display:none}.card-body{grid-template-columns:1fr 1fr}main{padding:12px}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-block">
+    <h1>ИАЛ · Изпълнителна агенция по лекарствата</h1>
+    <p>Регистър на лекарствените продукти</p>
+  </div>
+  <div class="db-count">
+    <strong id="totalCount">—</strong>записа в базата
+    <div id="updatedLabel" style="margin-top:4px;font-size:10px;color:var(--muted)">актуализация: <span id="updatedDate" style="color:var(--accent)">—</span></div>
+  </div>
+</header>
+
+<div class="search-bar">
+  <div class="search-wrap">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="text" id="searchInput" placeholder="Търси по наименование, описание, рег. №, ATC, INN…" autocomplete="off" spellcheck="false">
+  </div>
+  <div class="search-type">
+    <button class="type-btn active" data-mode="all">Всички полета</button>
+    <button class="type-btn" data-mode="name">Наименование + описание</button>
+    <button class="type-btn" data-mode="reg">Рег. №</button>
+    <button class="type-btn" data-mode="atc">АТС-Код</button>
+  </div>
+  <div class="rx-filter">
+    <button class="rx-btn" id="filterAll">Всички</button>
+    <button class="rx-btn" id="filterRx">С рецепта</button>
+    <button class="rx-btn" id="filterOtc">Без рецепта</button>
+  </div>
+</div>
+
+<div class="stats-bar">
+  <div>Намерени: <span id="resultCount">—</span></div>
+  <div id="fuzzyNote">⚡ Приблизително търсене активно</div>
+</div>
+
+<main>
+  <div id="loadingMsg"><span class="spin">⏳</span> Зареждане на базата данни…</div>
+  <div id="results"></div>
+  <div id="noResults">
+    <div class="big">💊</div>
+    <p>Няма намерени резултати.<br>Опитайте с различна дума или проверете изписването.</p>
+  </div>
+</main>
+
+<script>
+let allData=[], searchMode='all', rxFilter='all', searchTimeout;
+
+fetch('data.json')
+  .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+  .then(json=>{
+    const records = json.records || json;
+    allData = records.map(normaliseRow);
+    document.getElementById('totalCount').textContent = allData.length.toLocaleString('bg');
+    if (json.updated) {
+      const d = new Date(json.updated);
+      const formatted = d.toLocaleDateString('bg-BG', {day:'2-digit', month:'2-digit', year:'numeric'});
+      document.getElementById('updatedDate').textContent = formatted;
+      document.title = 'Регистър ИАЛ · ' + (json.source || formatted);
+    }
+    document.getElementById('loadingMsg').style.display = 'none';
+    doSearch();
+  })
+  .catch(err=>{
+    document.getElementById('loadingMsg').innerHTML=
+      '❌ Грешка при зареждане на <code>data.json</code>: '+err.message+
+      '<br><small>Уверете се, че файлът <code>data.json</code> е в същата папка като <code>index.html</code>.</small>';
+  });
+
+function normaliseRow(r){
+  const out={};
+  for(const k of Object.keys(r)){
+    if(k.toLowerCase().includes('търговско')||k.toLowerCase()==='trade name'){
+      out['Търговско наименование']=String(r[k]||'').trim();
+    } else {
+      out[k]=String(r[k]||'').trim();
+    }
+  }
+  return out;
+}
+
+function getName(r){ return r['Търговско наименование']||''; }
+
+function levenshtein(a,b){
+  const m=a.length,n=b.length;
+  if(!m)return n; if(!n)return m;
+  const dp=Array.from({length:m+1},(_,i)=>[i]);
+  for(let j=1;j<=n;j++)dp[0][j]=j;
+  for(let i=1;i<=m;i++)
+    for(let j=1;j<=n;j++)
+      dp[i][j]=a[i-1]===b[j-1]?dp[i-1][j-1]:1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
+  return dp[m][n];
+}
+
+function fuzzyMatch(text,query){
+  text=text.toLowerCase(); query=query.toLowerCase().trim();
+  if(!query)return{match:true,score:1,fuzzy:false};
+  if(text.includes(query))return{match:true,score:0,fuzzy:false};
+  const tokens=query.split(/\s+/);
+  if(tokens.length>1&&tokens.every(t=>text.includes(t)))return{match:true,score:0.3,fuzzy:false};
+  const maxDist=query.length<=4?1:query.length<=8?2:3;
+  for(const word of text.split(/\s+/)){
+    if(levenshtein(word.substring(0,query.length+2),query)<=maxDist)
+      return{match:true,score:1,fuzzy:true};
+  }
+  return{match:false};
+}
+
+function getSearchText(row,mode){
+  const name=getName(row), desc=row['Описание']||'';
+  switch(mode){
+    case 'name': return name+' '+desc;
+    case 'reg':  return row['Рег. №']||'';
+    case 'atc':  return row['АТС-Код']||'';
+    default: return [name,desc,row['INN']||'',row['АТС-Код']||'',row['Рег. №']||'',row['Притежател на РУ']||''].join(' ');
+  }
+}
+
+function doSearch(){
+  const q=document.getElementById('searchInput').value.trim();
+  let results=allData, anyFuzzy=false;
+  if(rxFilter==='rx')  results=results.filter(r=>r['Режим на предписване']==='По лекарско предписание');
+  if(rxFilter==='otc') results=results.filter(r=>r['Режим на предписване']==='Без лекарско предписание');
+  if(q){
+    const scored=results.map(row=>{
+      const m=fuzzyMatch(getSearchText(row,searchMode),q);
+      if(m.fuzzy)anyFuzzy=true;
+      return m.match?{row,score:m.score}:null;
+    }).filter(Boolean);
+    scored.sort((a,b)=>a.score-b.score);
+    results=scored.map(s=>s.row);
+  }
+  document.getElementById('fuzzyNote').style.display=anyFuzzy?'block':'none';
+  render(results,q);
+}
+
+function highlight(text,query){
+  if(!query||!text)return text||'';
+  const q=query.toLowerCase().trim();
+  const idx=text.toLowerCase().indexOf(q);
+  if(idx===-1)return text;
+  return text.slice(0,idx)+'<mark>'+text.slice(idx,idx+q.length)+'</mark>'+text.slice(idx+q.length);
+}
+
+function detailItem(label,value){
+  return`<div class="detail-item"><div class="detail-label">${label}</div><div class="detail-value">${value||'—'}</div></div>`;
+}
+
+function render(data,query){
+  const container=document.getElementById('results');
+  const noRes=document.getElementById('noResults');
+  document.getElementById('resultCount').textContent=data.length.toLocaleString('bg');
+  if(!data.length&&allData.length>0){container.innerHTML='';noRes.style.display='block';return;}
+  noRes.style.display='none';
+  const MAX=200, shown=data.slice(0,MAX);
+  container.innerHTML=shown.map((row,idx)=>{
+    const isRx=row['Режим на предписване']==='По лекарско предписание';
+    const name=getName(row);
+    return`<div class="drug-card ${isRx?'rx-card':'otc-card'}" id="card-${idx}">
+      <div class="card-header" onclick="toggleCard(${idx})">
+        <span class="rx-badge ${isRx?'badge-rx':'badge-otc'}">${isRx?'Rx':'OTC'}</span>
+        <div class="card-main">
+          <div class="drug-name">${highlight(name,query)}</div>
+          <div class="drug-desc">${highlight(row['Описание']||'',query)}</div>
+        </div>
+        <div class="card-meta">
+          <div class="meta-tag"><strong>${highlight(row['АТС-Код']||'—',query)}</strong><br>АТС</div>
+          <div class="meta-tag"><strong>${highlight(row['INN']||'—',query)}</strong><br>INN</div>
+          <div class="meta-tag"><strong>${highlight(row['Рег. №']||'—',query)}</strong><br>Рег. №</div>
+        </div>
+        <svg class="expand-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+      <div class="card-body">
+        ${detailItem('Идентификатор',row['Идентификатор'])}
+        ${detailItem('Лекарствена форма',row['Лек. форма'])}
+        ${detailItem('Опаковка',row['Опаковка'])}
+        ${detailItem('Обем / Доза',row['Обем/Дозова единица'])}
+        ${detailItem('Количество',row['Количество в крайна опаковка'])}
+        ${detailItem('Притежател на РУ',row['Притежател на РУ'])}
+        ${detailItem('Държава',row['Държава /EN/'])}
+        ${detailItem('Режим',row['Режим на предписване'])}
+      </div>
+    </div>`;
+  }).join('');
+  if(data.length>MAX){
+    container.innerHTML+=`<div style="text-align:center;padding:20px;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:12px;">
+      Показани ${MAX} от ${data.length.toLocaleString('bg')} резултата — прецизирайте търсенето.</div>`;
+  }
+}
+
+function toggleCard(idx){document.getElementById('card-'+idx).classList.toggle('expanded');}
+
+document.getElementById('searchInput').addEventListener('input',()=>{
+  clearTimeout(searchTimeout); searchTimeout=setTimeout(doSearch,200);
+});
+document.querySelectorAll('.type-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active'); searchMode=btn.dataset.mode; doSearch();
+  });
+});
+document.getElementById('filterAll').addEventListener('click',()=>setRxFilter('all'));
+document.getElementById('filterRx').addEventListener('click',()=>setRxFilter('rx'));
+document.getElementById('filterOtc').addEventListener('click',()=>setRxFilter('otc'));
+function setRxFilter(v){
+  rxFilter=v;
+  document.querySelectorAll('.rx-btn').forEach(b=>b.className='rx-btn');
+  if(v==='rx') document.getElementById('filterRx').classList.add('active-rx');
+  if(v==='otc')document.getElementById('filterOtc').classList.add('active-otc');
+  doSearch();
+}
+</script>
+</body>
+</html>
